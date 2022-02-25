@@ -155,7 +155,7 @@ public class HomeFragment extends Fragment implements OnFileSelectedListener {
         ).withListener(new MultiplePermissionsListener() {
             @Override
             public void onPermissionsChecked(MultiplePermissionsReport multiplePermissionsReport) {
-                displayFiles();
+                //displayFiles();
             }
 
             @Override

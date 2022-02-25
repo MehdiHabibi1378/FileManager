@@ -1,5 +1,6 @@
 package com.example.fileexplorer;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.text.format.Formatter;
 import android.view.LayoutInflater;
@@ -32,7 +33,7 @@ public class FileAdapter extends RecyclerView.Adapter<FileViewHolder> {
     }
 
     @Override
-    public void onBindViewHolder(@NonNull FileViewHolder holder, int position) {
+    public void onBindViewHolder(@NonNull FileViewHolder holder, @SuppressLint("RecyclerView") int position) {
         holder.tvName.setText(file.get(position).getName());
         holder.tvName.setSelected(true);
         int items = 0;

@@ -16,6 +16,7 @@ import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -37,7 +38,12 @@ import com.karumi.dexter.listener.PermissionRequest;
 import com.karumi.dexter.listener.multi.MultiplePermissionsListener;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -50,12 +56,13 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
     private FileAdapter fileAdapter;
     private RecyclerView recyclerView;
     private List<File> fileList;
-    private ImageView img_back;
+    private ImageView img_back,pasteButton;
     private TextView tv_pathHolder;
+    private LinearLayout button_bar;
     File storage;
     String data;
-    String[] items = {"Details","Rename","Delete","Share"};
-
+    String copy_path=null;
+    String[] items = {"Details","Rename","Delete","Share","Copy"};
     View view;
 
     @Nullable
@@ -65,25 +72,62 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
 
         tv_pathHolder = view.findViewById(R.id.tv_pathHolder);
         img_back = view.findViewById(R.id.img_back);
+        button_bar = view.findViewById(R.id.button_bar);
+        pasteButton = view.findViewById(R.id.paste);
 
 
         String internalStorage = System.getenv("EXTERNAL_STORAGE");
+        data = internalStorage;
         storage = new File(internalStorage);
 
         try {
           data = getArguments().getString("path");
+          copy_path = getArguments().getString("copyPath");
           File file = new File(data);
           storage = file;
         }catch (Exception e){
             e.printStackTrace();
         }
+        if (copy_path!=null){
+            button_bar.setVisibility(View.VISIBLE);
+        }
 
         tv_pathHolder.setText(storage.getAbsolutePath());
         runtimePermission();
 
+        pasteButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                button_bar.setVisibility(View.GONE);
+                String dstPath = data + copy_path.substring(copy_path.lastIndexOf('/'));
+                copy(new File(copy_path),new File(dstPath));
+                copy_path=null;
+                runtimePermission();
+
+            }
+        });
+
 
 
         return view;
+    }
+
+    private void copy(File src, File dst){
+        try {
+            InputStream in = new FileInputStream(src);
+            OutputStream out = new FileOutputStream(dst);
+            byte[] buf = new byte[1024];
+            int len;
+            while ((len = in.read(buf))>0){
+                out.write(buf,0,len);
+            }
+            out.close();
+            in.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void runtimePermission() {
@@ -142,6 +186,7 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
         if(file.isDirectory()){
             Bundle bundle = new Bundle();
             bundle.putString("path",file.getAbsolutePath());
+            bundle.putString("copyPath",copy_path);
             InternalFragment internalFragment = new InternalFragment();
             internalFragment.setArguments(bundle);
             getFragmentManager().beginTransaction().replace(R.id.fragment_container, internalFragment).addToBackStack(null).commit();
@@ -263,8 +308,11 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
                         share.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(file));
                         startActivity(Intent.createChooser(share,"Share "+filename));
                         break;
-
-
+                    case "Copy":
+                        copy_path = file.getAbsolutePath();
+                        button_bar.setVisibility(View.VISIBLE);
+                        optionDialog.cancel();
+                        break;
                 }
             }
         });
@@ -302,6 +350,8 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
                 imgOption.setImageResource(R.drawable.ic_delete);
             }else if (items[position].equals("Share")){
                 imgOption.setImageResource(R.drawable.ic_share);
+            }else if (items[position].equals("Copy")){
+                imgOption.setImageResource(R.drawable.ic_image);
             }
             return view;
         }
