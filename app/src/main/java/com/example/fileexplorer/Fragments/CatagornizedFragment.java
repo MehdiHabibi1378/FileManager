@@ -317,7 +317,7 @@ public class CatagornizedFragment extends Fragment implements OnFileSelectedList
             if (items[position].equals("Details")){
                 imgOption.setImageResource(R.drawable.ic_details);
             }else if (items[position].equals("Rename")){
-                imgOption.setImageResource(R.drawable.ic_folder);
+                imgOption.setImageResource(R.drawable.rename);
             }else if (items[position].equals("Delete")){
                 imgOption.setImageResource(R.drawable.ic_delete);
             }else if (items[position].equals("Share")){

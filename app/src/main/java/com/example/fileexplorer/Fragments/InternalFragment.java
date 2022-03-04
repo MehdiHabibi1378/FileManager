@@ -8,8 +8,10 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.text.InputType;
 import android.text.format.Formatter;
 import android.view.LayoutInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -18,11 +20,15 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.FileProvider;
+import androidx.core.view.GravityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -56,10 +62,11 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
     private FileAdapter fileAdapter;
     private RecyclerView recyclerView;
     private List<File> fileList;
-    private ImageView img_back,pasteButton;
-    private TextView tv_pathHolder;
+    private ImageView img_back,more;
+    private TextView tv_pathHolder,pasteButton;
     private LinearLayout button_bar;
     File storage;
+    File root;
     String data;
     String copy_path=null;
     String[] items = {"Details","Rename","Delete","Share","Copy"};
@@ -74,9 +81,17 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
         img_back = view.findViewById(R.id.img_back);
         button_bar = view.findViewById(R.id.button_bar);
         pasteButton = view.findViewById(R.id.paste);
+        more = view.findViewById(R.id.more);
+        more.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                showMenu(view);
+            }
+        });
 
 
         String internalStorage = System.getenv("EXTERNAL_STORAGE");
+        root = new File(internalStorage);
         data = internalStorage;
         storage = new File(internalStorage);
 
@@ -107,10 +122,26 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
             }
         });
 
-
-
+        OnBackPressedCallback callback = new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (!storage.equals(root)){
+                    File parent = new File(storage.getParent());
+                    Bundle bundle = new Bundle();
+                    bundle.putString("path",parent.getAbsolutePath());
+                    bundle.putString("copyPath",copy_path);
+                    InternalFragment internalFragment = new InternalFragment();
+                    internalFragment.setArguments(bundle);
+                    getFragmentManager().beginTransaction().replace(R.id.fragment_container, internalFragment).commit();
+                }else{
+                    getFragmentManager().beginTransaction().replace(R.id.fragment_container, new HomeFragment()).commit();
+                }
+            }
+        };
+        requireActivity().getOnBackPressedDispatcher().addCallback(getViewLifecycleOwner(),callback);
         return view;
     }
+
 
     private void copy(File src, File dst){
         try {
@@ -189,7 +220,7 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
             bundle.putString("copyPath",copy_path);
             InternalFragment internalFragment = new InternalFragment();
             internalFragment.setArguments(bundle);
-            getFragmentManager().beginTransaction().replace(R.id.fragment_container, internalFragment).addToBackStack(null).commit();
+            getFragmentManager().beginTransaction().replace(R.id.fragment_container, internalFragment).commit();
 
         }else {
             try {
@@ -241,15 +272,17 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
                         AlertDialog.Builder renameDialog = new AlertDialog.Builder(getContext());
                         renameDialog.setTitle("Rename File");
                         final EditText name = new EditText(getContext());
+                        String renamePath = file.getAbsolutePath();
+                        name.setText(renamePath.substring(renamePath.lastIndexOf('/')));
                         renameDialog.setView(name);
 
                         renameDialog.setPositiveButton("ok", new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 String new_name = name.getEditableText().toString();
-                                String extntion = file.getAbsolutePath().substring(file.getAbsolutePath().lastIndexOf("."));
+                                //String extntion = file.getAbsolutePath().substring(file.getAbsolutePath().lastIndexOf("."));
                                 File current = new File(file.getAbsolutePath());
-                                File destination = new File(file.getAbsolutePath().replace(file.getName(),new_name)+extntion);
+                                File destination = new File(file.getAbsolutePath().replace(file.getName(),new_name));
                                 if (current.renameTo(destination)){
                                     fileList.set(posi,destination);
                                     fileAdapter.notifyItemChanged(posi);
@@ -302,21 +335,61 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
                         break;
                     case "Share":
                         String filename = file.getName();
+                        Uri uri = FileProvider.getUriForFile(getContext(),getContext().getApplicationContext().getPackageName()+".provider",file);
                         Intent share = new Intent();
                         share.setAction(Intent.ACTION_SEND);
                         share.setType("image/jpeg");
-                        share.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(file));
+                        share.putExtra(Intent.EXTRA_STREAM, uri);
                         startActivity(Intent.createChooser(share,"Share "+filename));
                         break;
                     case "Copy":
-                        copy_path = file.getAbsolutePath();
-                        button_bar.setVisibility(View.VISIBLE);
-                        optionDialog.cancel();
+                        if (!file.isDirectory()){
+                            copy_path = file.getAbsolutePath();
+                            button_bar.setVisibility(View.VISIBLE);
+                            optionDialog.cancel();
+                        }
                         break;
                 }
             }
         });
 
+    }
+    private void showMenu(View view){
+        PopupMenu menu = new PopupMenu(getContext(),view);
+        menu.getMenuInflater().inflate(R.menu.option_menu,menu.getMenu());
+        menu.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+            @Override
+            public boolean onMenuItemClick(MenuItem menuItem) {
+                if (menuItem.getItemId() == R.id.new_folder){
+                    final AlertDialog.Builder newFolderDialog = new AlertDialog.Builder(getContext());
+                    newFolderDialog.setTitle("New Folder");
+                    final EditText input = new EditText(getContext());
+                    input.setInputType(InputType.TYPE_CLASS_TEXT);
+                    newFolderDialog.setView(input);
+                    newFolderDialog.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            File newFolder = new File(data+"/"+input.getText());
+                            if (!newFolder.exists()){
+                                newFolder.mkdir();
+                                fileAdapter.notifyDataSetChanged();
+                                runtimePermission();
+
+                            }
+                        }
+                    });
+                    newFolderDialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            dialogInterface.cancel();
+                        }
+                    });
+                    newFolderDialog.show();
+                }
+                return true;
+            }
+        });
+        menu.show();
     }
 
     class ListAdapter extends BaseAdapter{
@@ -345,13 +418,13 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
             if (items[position].equals("Details")){
                 imgOption.setImageResource(R.drawable.ic_details);
             }else if (items[position].equals("Rename")){
-                imgOption.setImageResource(R.drawable.ic_folder);
+                imgOption.setImageResource(R.drawable.rename);
             }else if (items[position].equals("Delete")){
                 imgOption.setImageResource(R.drawable.ic_delete);
             }else if (items[position].equals("Share")){
                 imgOption.setImageResource(R.drawable.ic_share);
             }else if (items[position].equals("Copy")){
-                imgOption.setImageResource(R.drawable.ic_image);
+                imgOption.setImageResource(R.drawable.copy);
             }
             return view;
         }

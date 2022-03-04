@@ -50,14 +50,12 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 break;
             case R.id.nav_internal:
                 InternalFragment internalFragment = new InternalFragment();
-                getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,internalFragment).addToBackStack(null).commit();
+                getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,internalFragment).commit();
                 break;
             case R.id.nav_card:
                 CardFragment cardFragment = new CardFragment();
-                getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,cardFragment).addToBackStack(null).commit();
+                getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,cardFragment).commit();
                 break;
-            case R.id.nav_about:
-                Toast.makeText(this, "About", Toast.LENGTH_SHORT).show();
                 
         }
         drawerLayout.closeDrawer(GravityCompat.START);

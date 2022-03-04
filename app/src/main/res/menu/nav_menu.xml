@@ -17,15 +17,5 @@
 
         </item>
     </group>
-    <item android:title="More">
-        <menu>
-            <item android:id="@+id/nav_about"
-                android:title="About"
-                android:icon="@drawable/ic_about">
-
-            </item>
-
-        </menu>
-    </item>
 
 </menu>

@@ -8,20 +8,26 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.text.InputType;
 import android.text.format.Formatter;
 import android.view.LayoutInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -37,7 +43,12 @@ import com.karumi.dexter.listener.PermissionRequest;
 import com.karumi.dexter.listener.multi.MultiplePermissionsListener;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -48,12 +59,15 @@ public class CardFragment extends Fragment implements OnFileSelectedListener {
     private FileAdapter fileAdapter;
     private RecyclerView recyclerView;
     private List<File> fileList;
-    private ImageView img_back;
-    private TextView tv_pathHolder;
+    private ImageView img_back,more;
+    private TextView tv_pathHolder,pasteButton;
+    private LinearLayout button_bar;
+    File root;
+    String copy_path=null;
     File storage;
     String secStorage;
     String data;
-    String[] items = {"Details","Rename","Delete","Share"};
+    String[] items = {"Details","Rename","Delete","Share","Copy"};
 
     View view;
 
@@ -64,6 +78,15 @@ public class CardFragment extends Fragment implements OnFileSelectedListener {
 
         tv_pathHolder = view.findViewById(R.id.tv_pathHolder);
         img_back = view.findViewById(R.id.img_back);
+        button_bar = view.findViewById(R.id.button_bar);
+        pasteButton = view.findViewById(R.id.paste);
+        more = view.findViewById(R.id.more);
+        more.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                showMenu(view);
+            }
+        });
 
         File[] externalCacheDirs = getContext().getExternalCacheDirs();
         for (File file: externalCacheDirs){
@@ -76,21 +99,74 @@ public class CardFragment extends Fragment implements OnFileSelectedListener {
 //        String cardStorage = System.getenv("SECONDARY_STORAGE");
 //        String in = String.valueOf(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS));
         storage = new File(secStorage);
+        root = storage;
 
         try {
           data = getArguments().getString("path");
+          copy_path = getArguments().getString("copyPath");
           File file = new File(data);
           storage = file;
         }catch (Exception e){
             e.printStackTrace();
         }
+        if (copy_path!=null){
+            button_bar.setVisibility(View.VISIBLE);
+        }
 
         tv_pathHolder.setText(storage.getAbsolutePath());
         runtimePermission();
 
+        pasteButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                button_bar.setVisibility(View.GONE);
+                String dstPath = data + copy_path.substring(copy_path.lastIndexOf('/'));
+                copy(new File(copy_path),new File(dstPath));
+                copy_path=null;
+                runtimePermission();
+
+            }
+        });
+
+        OnBackPressedCallback callback = new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (!storage.equals(root)){
+                    File parent = new File(storage.getParent());
+                    Bundle bundle = new Bundle();
+                    bundle.putString("path",parent.getAbsolutePath());
+                    bundle.putString("copyPath",copy_path);
+                    InternalFragment internalFragment = new InternalFragment();
+                    internalFragment.setArguments(bundle);
+                    getFragmentManager().beginTransaction().replace(R.id.fragment_container, internalFragment).commit();
+                }else{
+                    getFragmentManager().beginTransaction().replace(R.id.fragment_container, new HomeFragment()).commit();
+                }
+            }
+        };
+        requireActivity().getOnBackPressedDispatcher().addCallback(getViewLifecycleOwner(),callback);
+
 
 
         return view;
+    }
+
+    private void copy(File src, File dst){
+        try {
+            InputStream in = new FileInputStream(src);
+            OutputStream out = new FileOutputStream(dst);
+            byte[] buf = new byte[1024];
+            int len;
+            while ((len = in.read(buf))>0){
+                out.write(buf,0,len);
+            }
+            out.close();
+            in.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void runtimePermission() {
@@ -149,9 +225,10 @@ public class CardFragment extends Fragment implements OnFileSelectedListener {
         if(file.isDirectory()){
             Bundle bundle = new Bundle();
             bundle.putString("path",file.getAbsolutePath());
+            bundle.putString("copyPath",copy_path);
             CardFragment internalFragment = new CardFragment();
             internalFragment.setArguments(bundle);
-            getFragmentManager().beginTransaction().replace(R.id.fragment_container, internalFragment).addToBackStack(null).commit();
+            getFragmentManager().beginTransaction().replace(R.id.fragment_container, internalFragment).commit();
 
         }else {
             try {
@@ -203,15 +280,17 @@ public class CardFragment extends Fragment implements OnFileSelectedListener {
                         AlertDialog.Builder renameDialog = new AlertDialog.Builder(getContext());
                         renameDialog.setTitle("Rename File");
                         final EditText name = new EditText(getContext());
+                        String renamePath = file.getAbsolutePath();
+                        name.setText(renamePath.substring(renamePath.lastIndexOf('/')));
                         renameDialog.setView(name);
 
                         renameDialog.setPositiveButton("ok", new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 String new_name = name.getEditableText().toString();
-                                String extntion = file.getAbsolutePath().substring(file.getAbsolutePath().lastIndexOf("."));
+                                //String extntion = file.getAbsolutePath().substring(file.getAbsolutePath().lastIndexOf("."));
                                 File current = new File(file.getAbsolutePath());
-                                File destination = new File(file.getAbsolutePath().replace(file.getName(),new_name)+extntion);
+                                File destination = new File(file.getAbsolutePath().replace(file.getName(),new_name));
                                 if (current.renameTo(destination)){
                                     fileList.set(posi,destination);
                                     fileAdapter.notifyItemChanged(posi);
@@ -264,18 +343,62 @@ public class CardFragment extends Fragment implements OnFileSelectedListener {
                         break;
                     case "Share":
                         String filename = file.getName();
+                        Uri uri = FileProvider.getUriForFile(getContext(),getContext().getApplicationContext().getPackageName()+".provider",file);
                         Intent share = new Intent();
                         share.setAction(Intent.ACTION_SEND);
                         share.setType("image/jpeg");
-                        share.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(file));
+                        share.putExtra(Intent.EXTRA_STREAM, uri);
                         startActivity(Intent.createChooser(share,"Share "+filename));
                         break;
-
-
+                    case "Copy":
+                        if (!file.isDirectory()){
+                            copy_path = file.getAbsolutePath();
+                            button_bar.setVisibility(View.VISIBLE);
+                            optionDialog.cancel();
+                        }
+                        break;
                 }
             }
         });
 
+    }
+
+    private void showMenu(View view){
+        PopupMenu menu = new PopupMenu(getContext(),view);
+        menu.getMenuInflater().inflate(R.menu.option_menu,menu.getMenu());
+        menu.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+            @Override
+            public boolean onMenuItemClick(MenuItem menuItem) {
+                if (menuItem.getItemId() == R.id.new_folder){
+                    final AlertDialog.Builder newFolderDialog = new AlertDialog.Builder(getContext());
+                    newFolderDialog.setTitle("New Folder");
+                    final EditText input = new EditText(getContext());
+                    input.setInputType(InputType.TYPE_CLASS_TEXT);
+                    newFolderDialog.setView(input);
+                    newFolderDialog.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            File newFolder = new File(data+"/"+input.getText());
+                            if (!newFolder.exists()){
+                                newFolder.mkdir();
+                                fileAdapter.notifyDataSetChanged();
+                                runtimePermission();
+
+                            }
+                        }
+                    });
+                    newFolderDialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            dialogInterface.cancel();
+                        }
+                    });
+                    newFolderDialog.show();
+                }
+                return true;
+            }
+        });
+        menu.show();
     }
 
     class ListAdapter extends BaseAdapter{
@@ -304,11 +427,13 @@ public class CardFragment extends Fragment implements OnFileSelectedListener {
             if (items[position].equals("Details")){
                 imgOption.setImageResource(R.drawable.ic_details);
             }else if (items[position].equals("Rename")){
-                imgOption.setImageResource(R.drawable.ic_folder);
+                imgOption.setImageResource(R.drawable.rename);
             }else if (items[position].equals("Delete")){
                 imgOption.setImageResource(R.drawable.ic_delete);
             }else if (items[position].equals("Share")){
                 imgOption.setImageResource(R.drawable.ic_share);
+            }else if (items[position].equals("Copy")){
+                imgOption.setImageResource(R.drawable.copy);
             }
             return view;
         }

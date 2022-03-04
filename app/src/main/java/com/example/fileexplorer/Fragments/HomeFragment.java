@@ -22,6 +22,7 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
@@ -144,6 +145,14 @@ public class HomeFragment extends Fragment implements OnFileSelectedListener {
         });
 
         runtimePermission();
+
+        OnBackPressedCallback callback = new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                    getFragmentManager().beginTransaction().replace(R.id.fragment_container, new HomeFragment()).commit();
+            }
+        };
+        requireActivity().getOnBackPressedDispatcher().addCallback(getViewLifecycleOwner(),callback);
         return view;
     }
 
@@ -177,6 +186,7 @@ public class HomeFragment extends Fragment implements OnFileSelectedListener {
     }
 
 
+    @RequiresApi(api = Build.VERSION_CODES.N)
     public ArrayList<File> findFiles(File file){
         ArrayList<File> arrayList = new ArrayList<>();
         File[] files = file.listFiles();
@@ -362,7 +372,7 @@ public class HomeFragment extends Fragment implements OnFileSelectedListener {
             if (items[position].equals("Details")){
                 imgOption.setImageResource(R.drawable.ic_details);
             }else if (items[position].equals("Rename")){
-                imgOption.setImageResource(R.drawable.ic_folder);
+                imgOption.setImageResource(R.drawable.rename);
             }else if (items[position].equals("Delete")){
                 imgOption.setImageResource(R.drawable.ic_delete);
             }else if (items[position].equals("Share")){
