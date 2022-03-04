@@ -7,7 +7,6 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.text.InputType;
 import android.text.format.Formatter;
 import android.view.LayoutInflater;
@@ -28,7 +27,6 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
-import androidx.core.view.GravityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -50,12 +48,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 public class InternalFragment extends Fragment implements OnFileSelectedListener {
 
@@ -65,11 +61,12 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
     private ImageView img_back,more;
     private TextView tv_pathHolder,pasteButton;
     private LinearLayout button_bar;
+    boolean isCut;
     File storage;
     File root;
     String data;
     String copy_path=null;
-    String[] items = {"Details","Rename","Delete","Share","Copy"};
+    String[] items = {"Details","Rename","Delete","Share","Copy","Cut"};
     View view;
 
     @Nullable
@@ -98,6 +95,7 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
         try {
           data = getArguments().getString("path");
           copy_path = getArguments().getString("copyPath");
+          isCut = getArguments().getBoolean("isCute");
           File file = new File(data);
           storage = file;
         }catch (Exception e){
@@ -115,7 +113,12 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
             public void onClick(View view) {
                 button_bar.setVisibility(View.GONE);
                 String dstPath = data + copy_path.substring(copy_path.lastIndexOf('/'));
-                copy(new File(copy_path),new File(dstPath));
+                File copy = new File(copy_path);
+                copy(copy,new File(dstPath));
+                if (isCut){
+                    copy.delete();
+                    isCut =false;
+                }
                 copy_path=null;
                 runtimePermission();
 
@@ -130,6 +133,7 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
                     Bundle bundle = new Bundle();
                     bundle.putString("path",parent.getAbsolutePath());
                     bundle.putString("copyPath",copy_path);
+                    bundle.putBoolean("isCute", isCut);
                     InternalFragment internalFragment = new InternalFragment();
                     internalFragment.setArguments(bundle);
                     getFragmentManager().beginTransaction().replace(R.id.fragment_container, internalFragment).commit();
@@ -218,6 +222,7 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
             Bundle bundle = new Bundle();
             bundle.putString("path",file.getAbsolutePath());
             bundle.putString("copyPath",copy_path);
+            bundle.putBoolean("isCute", isCut);
             InternalFragment internalFragment = new InternalFragment();
             internalFragment.setArguments(bundle);
             getFragmentManager().beginTransaction().replace(R.id.fragment_container, internalFragment).commit();
@@ -312,7 +317,6 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 if (file.delete()) {
-
                                     fileList.remove(posi);
                                     fileAdapter.notifyDataSetChanged();
                                     Toast.makeText(getContext(), "Deleted", Toast.LENGTH_SHORT).show();
@@ -344,6 +348,14 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
                         break;
                     case "Copy":
                         if (!file.isDirectory()){
+                            copy_path = file.getAbsolutePath();
+                            button_bar.setVisibility(View.VISIBLE);
+                            optionDialog.cancel();
+                        }
+                        break;
+                    case "Cut":
+                        if (!file.isDirectory()){
+                            isCut = true;
                             copy_path = file.getAbsolutePath();
                             button_bar.setVisibility(View.VISIBLE);
                             optionDialog.cancel();
@@ -425,6 +437,8 @@ public class InternalFragment extends Fragment implements OnFileSelectedListener
                 imgOption.setImageResource(R.drawable.ic_share);
             }else if (items[position].equals("Copy")){
                 imgOption.setImageResource(R.drawable.copy);
+            }else if (items[position].equals("Cut")){
+                imgOption.setImageResource(R.drawable.cut);
             }
             return view;
         }

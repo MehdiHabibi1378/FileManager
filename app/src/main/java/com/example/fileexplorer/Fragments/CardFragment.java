@@ -62,12 +62,13 @@ public class CardFragment extends Fragment implements OnFileSelectedListener {
     private ImageView img_back,more;
     private TextView tv_pathHolder,pasteButton;
     private LinearLayout button_bar;
+    boolean isCut;
     File root;
     String copy_path=null;
     File storage;
     String secStorage;
     String data;
-    String[] items = {"Details","Rename","Delete","Share","Copy"};
+    String[] items = {"Details","Rename","Delete","Share","Copy","Cut"};
 
     View view;
 
@@ -104,6 +105,7 @@ public class CardFragment extends Fragment implements OnFileSelectedListener {
         try {
           data = getArguments().getString("path");
           copy_path = getArguments().getString("copyPath");
+            isCut = getArguments().getBoolean("isCute");
           File file = new File(data);
           storage = file;
         }catch (Exception e){
@@ -121,7 +123,12 @@ public class CardFragment extends Fragment implements OnFileSelectedListener {
             public void onClick(View view) {
                 button_bar.setVisibility(View.GONE);
                 String dstPath = data + copy_path.substring(copy_path.lastIndexOf('/'));
-                copy(new File(copy_path),new File(dstPath));
+                File copy = new File(copy_path);
+                copy(copy,new File(dstPath));
+                if (isCut){
+                    copy.delete();
+                    isCut =false;
+                }
                 copy_path=null;
                 runtimePermission();
 
@@ -136,6 +143,7 @@ public class CardFragment extends Fragment implements OnFileSelectedListener {
                     Bundle bundle = new Bundle();
                     bundle.putString("path",parent.getAbsolutePath());
                     bundle.putString("copyPath",copy_path);
+                    bundle.putBoolean("isCute", isCut);
                     InternalFragment internalFragment = new InternalFragment();
                     internalFragment.setArguments(bundle);
                     getFragmentManager().beginTransaction().replace(R.id.fragment_container, internalFragment).commit();
@@ -226,6 +234,7 @@ public class CardFragment extends Fragment implements OnFileSelectedListener {
             Bundle bundle = new Bundle();
             bundle.putString("path",file.getAbsolutePath());
             bundle.putString("copyPath",copy_path);
+            bundle.putBoolean("isCute", isCut);
             CardFragment internalFragment = new CardFragment();
             internalFragment.setArguments(bundle);
             getFragmentManager().beginTransaction().replace(R.id.fragment_container, internalFragment).commit();
@@ -357,6 +366,14 @@ public class CardFragment extends Fragment implements OnFileSelectedListener {
                             optionDialog.cancel();
                         }
                         break;
+                    case "Cut":
+                        if (!file.isDirectory()){
+                            isCut = true;
+                            copy_path = file.getAbsolutePath();
+                            button_bar.setVisibility(View.VISIBLE);
+                            optionDialog.cancel();
+                        }
+                        break;
                 }
             }
         });
@@ -434,6 +451,8 @@ public class CardFragment extends Fragment implements OnFileSelectedListener {
                 imgOption.setImageResource(R.drawable.ic_share);
             }else if (items[position].equals("Copy")){
                 imgOption.setImageResource(R.drawable.copy);
+            }else if (items[position].equals("Cut")){
+                imgOption.setImageResource(R.drawable.cut);
             }
             return view;
         }
